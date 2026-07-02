@@ -19,7 +19,5 @@
 
 ### Task 5 — Terraform Provisioning
 <img width="817" height="131" alt="Screenshot 2026-07-02 143602" src="https://github.com/user-attachments/assets/72422907-f311-4ad4-8714-5444ca945e68" />
-![EKS nodes ready](
-
 
 <img width="1162" height="143" alt="Screenshot 2026-07-02 140737" src="https://github.com/user-attachments/assets/9db3e265-fa37-4c89-9750-326ee55fa5d6" />
