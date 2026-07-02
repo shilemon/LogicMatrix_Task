@@ -1,0 +1,154 @@
+name: Build, Test, Push, and Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO_BACKEND: devops-assessment-backend
+  ECR_REPO_FRONTEND: devops-assessment-frontend
+  EKS_CLUSTER_NAME: devops-assessment-cluster
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm install
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm test
+
+  build-and-push-images:
+    needs: build-test
+    runs-on: ubuntu-latest
+    # This job pushes real images only if AWS credentials are configured as
+    # repository secrets. Otherwise it builds locally and "mocks" the push
+    # (builds + tags, but skips the actual `docker push`) so the pipeline
+    # still runs green in a fork/demo without cloud credentials.
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: vars
+        run: echo "image_tag=$(echo $GITHUB_SHA | cut -c1-8)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build backend image
+        run: |
+          docker build -t $ECR_REPO_BACKEND:${{ steps.vars.outputs.image_tag }} ./backend
+
+      - name: Build frontend image
+        run: |
+          docker build -t $ECR_REPO_FRONTEND:${{ steps.vars.outputs.image_tag }} ./frontend
+
+      - name: Tag and push images to ECR
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        run: |
+          REGISTRY=${{ steps.ecr-login.outputs.registry }}
+          docker tag $ECR_REPO_BACKEND:${{ steps.vars.outputs.image_tag }} $REGISTRY/$ECR_REPO_BACKEND:${{ steps.vars.outputs.image_tag }}
+          docker tag $ECR_REPO_FRONTEND:${{ steps.vars.outputs.image_tag }} $REGISTRY/$ECR_REPO_FRONTEND:${{ steps.vars.outputs.image_tag }}
+          docker push $REGISTRY/$ECR_REPO_BACKEND:${{ steps.vars.outputs.image_tag }}
+          docker push $REGISTRY/$ECR_REPO_FRONTEND:${{ steps.vars.outputs.image_tag }}
+
+      - name: Mock push (no AWS credentials configured)
+        if: ${{ secrets.AWS_ACCESS_KEY_ID == '' }}
+        run: |
+          echo "AWS credentials not set as repo secrets - skipping real ECR push."
+          echo "Images built locally and tagged: ${{ steps.vars.outputs.image_tag }}"
+
+  release:
+    needs: build-and-push-images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create GitHub release tag
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.build-and-push-images.outputs.image_tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: [build-and-push-images, release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+
+      - name: Deploy to EKS
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        run: |
+          IMAGE_TAG=${{ needs.build-and-push-images.outputs.image_tag }}
+          kubectl set image deployment/backend backend=$ECR_REPO_BACKEND:$IMAGE_TAG -n default
+          kubectl set image deployment/frontend frontend=$ECR_REPO_FRONTEND:$IMAGE_TAG -n default
+          kubectl rollout status deployment/backend -n default
+          kubectl rollout status deployment/frontend -n default
+
+      - name: Mock deploy (no AWS credentials configured)
+        if: ${{ secrets.AWS_ACCESS_KEY_ID == '' }}
+        run: |
+          echo "Would run: kubectl apply -f k8s/"
+          echo "Would run: kubectl set image deployment/backend backend=<ECR_IMAGE> -n default"
+          echo "Would run: kubectl set image deployment/frontend frontend=<ECR_IMAGE> -n default"
+
+# ---------------------------------------------------------------------------
+# SECRETS MANAGEMENT (referenced in Task 2)
+# ---------------------------------------------------------------------------
+# - AWS credentials for CI: stored as GitHub Actions repository/organization
+#   Secrets (Settings > Secrets and variables > Actions), never committed to
+#   the repo. Prefer OIDC federation (aws-actions/configure-aws-credentials
+#   supports role assumption via OIDC) over long-lived access keys.
+# - Application/runtime secrets (DB password, API keys): stored in AWS
+#   Secrets Manager, synced into the cluster with the "External Secrets
+#   Operator" or the "AWS Secrets and Configuration Provider (ASCP)" for the
+#   Kubernetes Secrets Store CSI Driver. The pod mounts/reads a Kubernetes
+#   Secret that is populated from Secrets Manager - the actual secret value
+#   never lives in Git.
+# - Non-sensitive configuration (log level, feature flags, DB host/port)
+#   lives in a Kubernetes ConfigMap (k8s/backend-configmap.yaml) since it is
+#   not confidential.

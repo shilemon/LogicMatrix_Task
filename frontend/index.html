@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>DevOps Assessment Frontend</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: 60px auto; }
+  #status { padding: 12px; border-radius: 6px; background: #f0f0f0; }
+  .ok { color: green; font-weight: bold; }
+  .err { color: red; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h1>DevOps Assessment</h1>
+  <p>This static page is served by the frontend container and calls the backend API.</p>
+  <div id="status">Checking backend...</div>
+
+  <script>
+    // BACKEND_URL is injected at container start via env.js (see nginx entrypoint)
+    // Defaults to relative /api path when served behind the same ingress.
+    const backendUrl = window.BACKEND_URL || '/api';
+
+    fetch(backendUrl + '/health')
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('status').innerHTML =
+          '<span class="ok">Backend status: ' + data.status + '</span>';
+      })
+      .catch(err => {
+        document.getElementById('status').innerHTML =
+          '<span class="err">Backend unreachable: ' + err + '</span>';
+      });
+  </script>
+</body>
+</html>

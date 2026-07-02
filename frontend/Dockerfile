@@ -1,0 +1,11 @@
+FROM nginx:1.27-alpine
+
+COPY index.html /usr/share/nginx/html/index.html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 8081
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8081/healthz || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

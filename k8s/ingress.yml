@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    # Terminate TLS at the ALB using an ACM certificate (set the ARN below).
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:xxxx:certificate/xxxx
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8081
+
+# Requires the AWS Load Balancer Controller add-on installed in the EKS
+# cluster (provisioned via the Terraform eks module / a Helm release).
+# It provisions an ALB automatically from this Ingress resource.

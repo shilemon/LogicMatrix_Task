@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.*
+*.pem
+*.key
+terraform/**/.terraform
+terraform/**/*.tfstate
+terraform/**/*.tfstate.backup
+docs
+.github
