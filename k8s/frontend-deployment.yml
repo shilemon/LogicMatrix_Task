@@ -39,5 +39,5 @@ spec:
               cpu: "200m"
               memory: "128Mi"
           securityContext:
-            runAsNonRoot: false  # nginx base image runs as root by default; harden further in production
+            runAsNonRoot: false  
             allowPrivilegeEscalation: false
