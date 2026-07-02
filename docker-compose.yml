@@ -1,9 +1,8 @@
-version: "3.9"
 
 services:
   backend:
     build:
-      context: ./backend
+      context: ./Backend
     container_name: devops-backend
     ports:
       - "8080:8080"
