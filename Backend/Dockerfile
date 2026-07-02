@@ -8,7 +8,6 @@ RUN npm install --omit=dev
 FROM node:20-alpine
 WORKDIR /app
 
-# Run as non-root user (numeric UID/GID so Kubernetes runAsNonRoot can verify it)
 RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
 
 COPY --from=builder /app/node_modules ./node_modules
