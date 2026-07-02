@@ -7,6 +7,6 @@ data:
   LOG_LEVEL: "info"
   # Non-sensitive DB connection info. Host is the private RDS endpoint
   # (resolved via Route 53 private hosted zone / RDS-managed private DNS).
-  DB_HOST: "devops-assessment-db.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com"
+  DB_HOST: "devops-assessment-cluster-dev-db.cuzkcaii8hmy.us-east-1.rds.amazonaws.com"
   DB_PORT: "5432"
   DB_NAME: "appdb"

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: <ECR_REGISTRY>/devops-assessment-backend:latest
+          image: 145213755478.dkr.ecr.us-east-1.amazonaws.com/devops-assessment-backend:v2
           ports:
             - containerPort: 8080
           envFrom:

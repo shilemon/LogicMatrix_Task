@@ -40,16 +40,16 @@ variable "node_min_size" {
   default     = 2
 }
 
-variable "node_max_size" {
-  description = "Maximum number of worker nodes"
+variable "node_desired_size" {
+  description = "Desired number of worker nodes"
   type        = number
   default     = 4
 }
 
-variable "node_desired_size" {
-  description = "Desired number of worker nodes"
+variable "node_max_size" {
+  description = "Maximum number of worker nodes"
   type        = number
-  default     = 2
+  default     = 5
 }
 
 variable "db_instance_class" {
