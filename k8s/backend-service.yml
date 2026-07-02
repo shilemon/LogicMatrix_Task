@@ -5,7 +5,7 @@ metadata:
   labels:
     app: backend
 spec:
-  type: ClusterIP   # internal only - never exposed directly to the internet
+  type: ClusterIP   
   selector:
     app: backend
   ports:
